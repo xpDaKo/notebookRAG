@@ -1,10 +1,24 @@
 import os
 import re
-from typing import List
+from typing import List, Any
 from tqdm import tqdm
 import fitz
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+class Splitter(RecursiveCharacterTextSplitter):
+    def __init__(self, **kwargs: Any) -> None:
+        """
+        通过正则来实现更灵活的分割
+        """
+        separators = [ # 存放正则规则
+            r"\n\n", r"\n",                               
+            r"。", r"！", r"？",
+            r" ", r""
+        ]
+        is_separator_regex = True # 设置为True来启用正则表达式分隔符
+
+        super().__init__(separators= separators, is_separator_regex= is_separator_regex, **kwargs)
 
 def pdf2documents(directory: str) -> List[Document]:
     """
@@ -26,14 +40,22 @@ def pdf2documents(directory: str) -> List[Document]:
 
             texts.append(page_text)
             metadatas.append(metadata)
-
-    text_splitter = RecursiveCharacterTextSplitter(
-        separators=["\n\n", "\n", "。", "！", "？", " ", ""],
-        chunk_size=500,
-        chunk_overlap=100
-    )
-    documents = text_splitter.create_documents(texts, metadatas=metadatas)
+    documents = RecursiveCharacterTextSplitter().create_documents(texts, metadatas=metadatas)
     return documents
+
+def splitter(documents: List[Document], chunk_size: int, chunk_overlap: int) -> List[Document]:
+    """
+    对文档进行切分
+    :param documents: 待分割的文档
+    :param chunk_size: chunk大小
+    :param chunk_overlap: chunk的重合大小
+    :return new_documents: 处理后的documents ,使用new_documents防止覆盖原本的documents
+    """
+    new_documents = Splitter(
+        chunk_size=chunk_size, 
+        chunk_overlap=chunk_overlap,
+        ).split_documents(documents)
+    return new_documents
 
 def get_pdf_path(directory: str) -> List[str]:
     """
@@ -69,3 +91,14 @@ def remove_useless_content(text: str,pdf_path: str):
     text = re.sub(title_key, '',text)
 
     return text
+
+
+from src.loader import get_pdf_path
+from src.loader import pdf2documents
+from src.loader import splitter
+pdf_files_path = get_pdf_path(r"data\notes")
+pdf_files_path
+documents = pdf2documents(r"data\notes")
+documents
+ndocuments = splitter(documents,500,100)
+ndocuments
